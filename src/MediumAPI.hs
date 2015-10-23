@@ -116,13 +116,7 @@ data CreatedPost = CreatedPost { postId            :: Text
                                , postPublishStatus :: PublishStatus
                                , publishedAt       :: Maybe Integer
                                , postLicense       :: License
-                               , licenseUrl        :: Maybe Text
-                               -- nb - according to the docs the "licenseUrl"
-                               -- field will be present in the response JSON,
-                               -- but so far it never seems to be. I'm putting
-                               -- this here as a placeholder, but for now it
-                               -- will always be @Nothing@. See:
-                               -- https://github.com/Medium/medium-api-docs/pull/17
+                               , licenseUrl        :: Text
                                }
                                deriving (Show, Read, Eq, Generic)
 
@@ -138,7 +132,7 @@ instance FromJSON CreatedPost where
                <*> o' .:  "publishStatus"
                <*> o' .:? "publishedAt"
                <*> o' .:  "license"
-               <*> o' .:? "licenseUrl"
+               <*> o' .:  "licenseUrl"
     parseJSON _          = error "Expected an object"
 
 defaultPost :: NewPost
