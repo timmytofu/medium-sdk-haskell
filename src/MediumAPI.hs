@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds                                                     #-}
+{-# LANGUAGE StandaloneDeriving                                            #-}
 {-# LANGUAGE DeriveGeneric                                                 #-}
 {-# LANGUAGE OverloadedStrings                                             #-}
+{-# LANGUAGE RecordWildCards                                               #-}
 {-# LANGUAGE TypeFamilies                                                  #-}
 {-# LANGUAGE TypeOperators                                                 #-}
 
@@ -9,15 +11,39 @@ module MediumAPI where
 import           Control.Applicative
 import           Control.Monad.Trans.Either
 import           Data.Aeson
+import           Data.ByteString                           (intercalate)
+import           Data.Default.Class
 import           Data.Proxy
-import           Data.Text
+import           Data.String
+import           Data.Text                                 (Text)
+import           Data.Text.Encoding                        (encodeUtf8)
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
 import           GHC.Generics
+
+import           Network.HTTP.Client                       hiding (Proxy)
 
 import           Servant
 import           Servant.Client
 
+
 type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
          :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
+         :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
+
+data TokenRequest = TokenRequest { shortTermCode :: Text
+                                 , clientId      :: Text
+                                 , clientSecret  :: Text
+                                 , redirectUri   :: Text
+                                 }
+
+instance ToFormUrlEncoded TokenRequest where
+    toFormUrlEncoded TokenRequest{..} = [ ("code", shortTermCode)
+                                        , ("client_id", clientId)
+                                        , ("client_secret", clientSecret)
+                                        , ("grant_type", "authorization_code")
+                                        , ("redirect_uri", redirectUri)
+                                        ]
 
 type Token = Text
 
@@ -135,16 +161,71 @@ instance FromJSON CreatedPost where
                <*> o' .:  "licenseUrl"
     parseJSON _          = error "Expected an object"
 
+data Scope = BasicProfile | PublishPost | UploadImage deriving (Show, Read, Eq)
+
+scopeString :: IsString a => Scope -> a
+scopeString BasicProfile = "basicProfile"
+scopeString PublishPost  = "publishPost"
+scopeString UploadImage  = "uploadImage"
+
+instance ToJSON Scope where
+    toJSON = scopeString
+
+instance FromJSON Scope where
+    parseJSON "basicProfile" = return BasicProfile
+    parseJSON "publishPost"  = return PublishPost
+    parseJSON "uploadImage"  = return UploadImage
+    parseJSON _              = error "Invalid scope value"
+
+data TokenResp = TokenResp { tokenType    :: Text
+                           , accessToken  :: Text
+                           , refreshToken :: Text
+                           , scope        :: [Scope]
+                           , expiresAt    :: UTCTime
+                           }
+                           deriving (Show, Eq)
+
+instance FromJSON TokenResp where
+    parseJSON (Object o) = TokenResp "Bearer"
+                                     <$> o .: "access_token"
+                                     <*> o .: "refresh_token"
+                                     <*> o .: "scope"
+                                     <*> (milliToUtc <$> o .: "expires_at")
+    parseJSON _          = error "Expected an object"
+
+milliToUtc :: POSIXTime -> UTCTime
+milliToUtc = posixSecondsToUTCTime . (/ 1000)
+
 defaultPost :: NewPost
 defaultPost = NewPost "" Html "" [] Nothing Public AllRightsReserved
 
 baseUrl :: BaseUrl
 baseUrl = BaseUrl Https "api.medium.com" 443
 
-me ::  Maybe Token -> EitherT ServantError IO User
-posts :: Text -> Maybe Token -> NewPost -> EitherT ServantError IO CreatedPost
+-- TODO: scope list should be non-empty
+shortTermCodeUrl :: Text -> [Scope] -> Text -> Text -> String
+shortTermCodeUrl clientId requestedScope stateText redirectUrl =
+    show . getUri $
+      setQueryString [ ("client_id",    Just $ encodeUtf8 clientId)
+                     , ("state",        Just $ encodeUtf8 stateText)
+                     , ("redirect_uri", Just $ encodeUtf8 redirectUrl)
+                     , ("scope",        Just scopeList)
+                     , ("responseType", Just "code")
+                     ]
+                     def { host = "medium.com"
+                         , port = 443
+                         , secure = True
+                         , path = "/m/oauth/authorize"
+                         }
+  where scopeList = intercalate "," $ map scopeString requestedScope
+
+type EitherIO x = EitherT x IO
+
+me ::  Maybe Token -> EitherIO ServantError User
+posts :: Text -> Maybe Token -> NewPost -> EitherIO ServantError CreatedPost
+tokenFromAuthCode :: TokenRequest -> EitherIO ServantError TokenResp
 
 api :: Proxy API
 api = Proxy
 
-me :<|> posts = client api baseUrl
+me :<|> posts :<|> tokenFromAuthCode = client api baseUrl
