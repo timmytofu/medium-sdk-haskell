@@ -31,14 +31,14 @@ type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
          :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
          :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
 
-data TokenRequest = TokenRequest { shortTermCode :: Text
+data TokenRequest = TokenRequest { authCode :: Text
                                  , clientId      :: Text
                                  , clientSecret  :: Text
                                  , redirectUri   :: Text
                                  }
 
 instance ToFormUrlEncoded TokenRequest where
-    toFormUrlEncoded TokenRequest{..} = [ ("code", shortTermCode)
+    toFormUrlEncoded TokenRequest{..} = [ ("code", authCode)
                                         , ("client_id", clientId)
                                         , ("client_secret", clientSecret)
                                         , ("grant_type", "authorization_code")
@@ -203,8 +203,8 @@ baseUrl :: BaseUrl
 baseUrl = BaseUrl Https "api.medium.com" 443
 
 -- TODO: scope list should be non-empty
-shortTermCodeUrl :: Text -> [Scope] -> Text -> Text -> String
-shortTermCodeUrl clientId requestedScope stateText redirectUrl =
+authCodeUrl :: Text -> [Scope] -> Text -> Text -> String
+authCodeUrl clientId requestedScope stateText redirectUrl =
     show . getUri $
       setQueryString [ ("client_id",    Just $ encodeUtf8 clientId)
                      , ("state",        Just $ encodeUtf8 stateText)
