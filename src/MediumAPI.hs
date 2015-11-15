@@ -13,6 +13,7 @@ import           Control.Monad.Trans.Either
 import           Data.Aeson
 import           Data.ByteString                           (intercalate)
 import           Data.Default.Class
+import           Data.Monoid
 import           Data.Proxy
 import           Data.String
 import           Data.Text                                 (Text)
@@ -45,7 +46,10 @@ instance ToFormUrlEncoded TokenRequest where
                                         , ("redirect_uri", redirectUri)
                                         ]
 
-type Token = Text
+newtype Token = Token { token :: Text } deriving (Show, Read, Eq)
+
+instance ToText Token where
+    toText Token{..} = "Bearer " <> token
 
 data ContentFormat = Html | Markdown
                    deriving (Show, Read, Eq, Generic)
