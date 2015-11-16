@@ -31,6 +31,7 @@ import           Servant.Client
 type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
          :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
          :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
+         :<|> "v1" :> "tokens" :> Header "Authorization" Token :> ReqBody '[FormUrlEncoded] RefreshRequest :> Post '[JSON] TokenResp
 
 data TokenRequest = TokenRequest { authCode :: Text
                                  , clientId      :: Text
@@ -197,6 +198,20 @@ instance FromJSON TokenResp where
                                      <*> (milliToUtc <$> o .: "expires_at")
     parseJSON _          = error "Expected an object"
 
+data RefreshRequest = RefreshRequest { refreshToken' :: Text
+                                     , clientId'     :: Text
+                                     , clientSecret' :: Text
+                                     }
+                                     deriving (Show, Read, Eq)
+
+instance ToFormUrlEncoded RefreshRequest where
+    toFormUrlEncoded RefreshRequest{..} = [ ("refresh_token", refreshToken')
+                                          , ("client_id",     clientId')
+                                          , ("client_secret", clientSecret')
+                                          , ("grant_type",    "refresh_token")
+                                          ]
+
+
 milliToUtc :: POSIXTime -> UTCTime
 milliToUtc = posixSecondsToUTCTime . (/ 1000)
 
@@ -228,8 +243,9 @@ type EitherIO x = EitherT x IO
 me ::  Maybe Token -> EitherIO ServantError User
 posts :: Text -> Maybe Token -> NewPost -> EitherIO ServantError CreatedPost
 tokenFromAuthCode :: TokenRequest -> EitherIO ServantError TokenResp
+refreshAuthToken :: Maybe Token -> RefreshRequest -> EitherIO ServantError TokenResp
 
 api :: Proxy API
 api = Proxy
 
-me :<|> posts :<|> tokenFromAuthCode = client api baseUrl
+me :<|> posts :<|> tokenFromAuthCode :<|> refreshAuthToken = client api baseUrl
