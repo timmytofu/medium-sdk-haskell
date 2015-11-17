@@ -25,3 +25,7 @@ library
                      , servant-server             == 0.4.*
                      , text                       == 1.*
                      , time                       >  1          && < 2
+
+source-repository head
+  type:     git
+  location: https://github.com/timmytofu/medium-sdk-haskell
