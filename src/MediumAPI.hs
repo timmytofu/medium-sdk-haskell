@@ -30,6 +30,7 @@ import           Servant.Client
 
 type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
          :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
+         :<|> "v1" :> "users" :> Capture "userId" Text :> "publications" :> Header "Authorization" Token :> Get '[JSON] PubList
          :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
          :<|> "v1" :> "tokens" :> Header "Authorization" Token :> ReqBody '[FormUrlEncoded] RefreshRequest :> Post '[JSON] TokenResp
 
@@ -124,6 +125,32 @@ instance FromJSON User where
            <*> o' .: "url"
            <*> o' .: "imageUrl"
     parseJSON _          = error "Expected an object"
+
+data Publication = Publication { publicationId               :: Text
+                               , publicationName             :: Text
+                               , publicationDescription      :: Text
+                               , publicationUrl              :: Text
+                               , publicationImgUrl           :: Text
+                               } deriving (Show, Read, Eq)
+
+instance FromJSON Publication where
+    parseJSON (Object o) = Publication <$> o .: "id"
+                                       <*> o .: "name"
+                                       <*> o .: "description"
+                                       <*> o .: "url"
+                                       <*> o .: "imageUrl"
+    parseJSON _          = error "Expected an object"
+
+-- Since the publications endpoint (like all) returns the data wrapped in
+-- a @data@ envelope…
+newtype PubList = PubList [Publication] deriving (Show, Read, Eq)
+
+instance FromJSON PubList where
+    parseJSON (Object o) = do
+      o' <- o .: "data"
+      PubList <$> parseJSON o'
+    parseJSON _          = error "Expected an object"
+
 
 data NewPost = NewPost { title         :: Text
                        , contentFormat :: ContentFormat
@@ -244,6 +271,7 @@ authCodeUrl clientId requestedScope stateText redirectUrl =
 type EitherIO x = EitherT x IO
 
 me ::  Maybe Token -> EitherIO ServantError User
+publications :: Text -> Maybe Token -> EitherIO ServantError PubList
 posts :: Text -> Maybe Token -> NewPost -> EitherIO ServantError CreatedPost
 tokenFromAuthCode :: TokenRequest -> EitherIO ServantError TokenResp
 refreshAuthToken :: Maybe Token -> RefreshRequest -> EitherIO ServantError TokenResp
@@ -251,4 +279,4 @@ refreshAuthToken :: Maybe Token -> RefreshRequest -> EitherIO ServantError Token
 api :: Proxy API
 api = Proxy
 
-me :<|> posts :<|> tokenFromAuthCode :<|> refreshAuthToken = client api baseUrl
+me :<|> posts :<|> publications :<|> tokenFromAuthCode :<|> refreshAuthToken = client api baseUrl
