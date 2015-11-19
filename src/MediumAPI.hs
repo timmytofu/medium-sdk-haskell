@@ -166,21 +166,24 @@ instance FromJSON CreatedPost where
                <*> o' .:  "licenseUrl"
     parseJSON _          = error "Expected an object"
 
-data Scope = BasicProfile | PublishPost | UploadImage deriving (Show, Read, Eq)
+data Scope = BasicProfile | ListPublications | PublishPost | UploadImage
+           deriving (Show, Read, Eq)
 
 scopeString :: IsString a => Scope -> a
-scopeString BasicProfile = "basicProfile"
-scopeString PublishPost  = "publishPost"
-scopeString UploadImage  = "uploadImage"
+scopeString BasicProfile     = "basicProfile"
+scopeString ListPublications = "listPublications"
+scopeString PublishPost      = "publishPost"
+scopeString UploadImage      = "uploadImage"
 
 instance ToJSON Scope where
     toJSON = scopeString
 
 instance FromJSON Scope where
-    parseJSON "basicProfile" = return BasicProfile
-    parseJSON "publishPost"  = return PublishPost
-    parseJSON "uploadImage"  = return UploadImage
-    parseJSON _              = error "Invalid scope value"
+    parseJSON "basicProfile"      = return BasicProfile
+    parseJSON "listPublications"  = return ListPublications
+    parseJSON "publishPost"       = return PublishPost
+    parseJSON "uploadImage"       = return UploadImage
+    parseJSON _                   = error "Invalid scope value"
 
 data TokenResp = TokenResp { tokenType    :: Text
                            , accessToken  :: Text
