@@ -28,7 +28,7 @@ import           Servant
 import           Servant.Client
 
 
-data TokenRequest = TokenRequest { authCode :: Text
+data TokenRequest = TokenRequest { authCode      :: Text
                                  , clientId      :: Text
                                  , clientSecret  :: Text
                                  , redirectUri   :: Text
