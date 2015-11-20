@@ -28,12 +28,6 @@ import           Servant
 import           Servant.Client
 
 
-type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
-         :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
-         :<|> "v1" :> "users" :> Capture "userId" Text :> "publications" :> Header "Authorization" Token :> Get '[JSON] PubList
-         :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
-         :<|> "v1" :> "tokens" :> Header "Authorization" Token :> ReqBody '[FormUrlEncoded] RefreshRequest :> Post '[JSON] TokenResp
-
 data TokenRequest = TokenRequest { authCode :: Text
                                  , clientId      :: Text
                                  , clientSecret  :: Text
@@ -276,7 +270,14 @@ posts :: Text -> Maybe Token -> NewPost -> EitherIO ServantError CreatedPost
 tokenFromAuthCode :: TokenRequest -> EitherIO ServantError TokenResp
 refreshAuthToken :: Maybe Token -> RefreshRequest -> EitherIO ServantError TokenResp
 
+type API = "v1" :> "me" :> Header "Authorization" Token :> Get '[JSON] User
+         :<|> "v1" :> "users" :> Capture "authorId" Text :> "posts" :> Header "Authorization" Token :> ReqBody '[JSON] NewPost :> Post '[JSON] CreatedPost
+         :<|> "v1" :> "users" :> Capture "userId" Text :> "publications" :> Header "Authorization" Token :> Get '[JSON] PubList
+         :<|> "v1" :> "tokens" :> ReqBody '[FormUrlEncoded] TokenRequest :> Post '[JSON] TokenResp
+         :<|> "v1" :> "tokens" :> Header "Authorization" Token :> ReqBody '[FormUrlEncoded] RefreshRequest :> Post '[JSON] TokenResp
+
+me :<|> posts :<|> publications :<|> tokenFromAuthCode :<|> refreshAuthToken = client api baseUrl
+
 api :: Proxy API
 api = Proxy
 
-me :<|> posts :<|> publications :<|> tokenFromAuthCode :<|> refreshAuthToken = client api baseUrl
